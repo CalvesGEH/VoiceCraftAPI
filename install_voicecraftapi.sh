@@ -37,19 +37,20 @@ install_conda() {
 install_api_packages() {
     info "Installing VoiceCraftAPI packages..."
     # Create a conda environment named voicecraftapi only if it doesn't exist
-    if [ "$(${CONDA_BINARY} env list | grep voicecraftapi)" ]; then
+    if [ "$(conda env list | grep voicecraftapi)" ]; then
         info "VoiceCraftAPI environment already exists. Updating..."
     else
-        $CONDA_BINARY create -n voicecraftapi python=3.9.16 -y
+        conda create -n voicecraftapi python=3.9.16 -y
     fi
     # Activate the environment
-    $CONDA_BINARY activate voicecraftapi
+    conda activate voicecraftapi
 
     # Install all packages from VoiceCraft README: https://github.com/jasonppy/VoiceCraft
     info "Installing apt packages..."
     sudo apt-get update
+    sudo apt-get install -y git
     sudo apt-get install -y ffmpeg
-    sudo apt-get install espeak-ng
+    sudo apt-get install -y espeak-ng
     sudo apt-get install -y espeak espeak-data libespeak1 libespeak-dev
     sudo apt-get install -y festival*
     sudo apt-get install -y build-essential
@@ -60,7 +61,7 @@ install_api_packages() {
     pip install -r "${VOICECRAFTAPI_PATH}/requirements.txt"
 
     info "Installing mfa and mfa models..."
-    $CONDA_BINARY install -c conda-forge montreal-forced-aligner=2.2.17 openfst=1.8.2 kaldi=5.5.1068
+    conda install -c conda-forge montreal-forced-aligner=2.2.17 openfst=1.8.2 kaldi=5.5.1068
     mfa model download dictionary english_us_arpa
     mfa model download acoustic english_us_arpa
 
@@ -72,6 +73,11 @@ info "Please input your password so that the script can use sudo to install syst
 sudo -v
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
+# Log all paths
+info "VOICECRAFTAPI_PATH: ${VOICECRAFTAPI_PATH}"
+info "CONDA_PATH: ${CONDA_PATH}"
+info "CONDA_BINARY: ${CONDA_BINARY}"
+
 # Enter the VoiceCraftAPI path
 info "Entering VoiceCraftAPI folder: ${VOICECRAFTAPI_PATH}"
 cd "${VOICECRAFTAPI_PATH}"
@@ -81,12 +87,20 @@ if ! command -v $CONDA_BINARY &> /dev/null; then
     install_conda
 else
     info "Conda already installed. Activating 'voicecraftapi' environment..."
-    $CONDA_BINARY activate voicecraftapi
+    $CONDA_BINARY init
+    conda activate voicecraftapi
 fi
 
 # Install packages
 install_api_packages
 
 # Clone the VoiceCraft repository.
-info "Cloning the VoiceCraft repository..."
-git clone https://github.com/jasonppy/VoiceCraft
+if [ -d "${VOICECRAFTAPI_PATH}/VoiceCraft" ]; then
+    info "VoiceCraft repository is already here. Pulling any changes..."
+    cd "${VOICECRAFTAPI_PATH}/VoiceCraft"
+    git pull
+    cd "${VOICECRAFTAPI_PATH}"
+else
+    info "Cloning the VoiceCraft repository..."
+    git clone https://github.com/jasonppy/VoiceCraft
+fi
