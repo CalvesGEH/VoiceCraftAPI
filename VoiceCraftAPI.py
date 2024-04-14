@@ -118,7 +118,14 @@ class WhisperxModel:
         segments = self.model.transcribe(audio_path, batch_size=8)["segments"]
         return self.align_model.align(segments, audio_path)
 
-
+# Parameters:
+#     whisper_backend_name: 'whisper' or 'whisperX'. 'whisperX' is default.
+#     whisper_mode_name: 'None', 'base.en', 'small.en', 'medium.en', 'large'. 'base.en' is default.
+#     alignment_mode_name: 'None'or 'whisperX'. 'whisperX' is default.
+#     voicecraft_model:
+#         - 'giga330M'
+#         - 'giga830M' (default)
+#         - 'giga330M_TTSEnhanced'
 def load_models(whisper_backend_name, whisper_model_name, alignment_model_name, voicecraft_model_name):
     global transcribe_model, align_model, voicecraft_model
 
@@ -499,7 +506,7 @@ async def generate_voice_audio(
 if __name__ == "__main__":
     import uvicorn
     logger.info("Loading models...")
-    load_models()
+    load_models('whisperX', 'base.en', 'whisperX', 'giga830M')
 
     logger.info("Starting uvicorn server...")
     uvicorn.run(app, host="0.0.0.0", port=8245)
