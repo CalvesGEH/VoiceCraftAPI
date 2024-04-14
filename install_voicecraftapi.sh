@@ -45,7 +45,7 @@ install_api_packages() {
         conda create -n voicecraftapi python=3.9.16 -y
     fi
     # Activate the environment
-    conda activate voicecraftapi
+    source activate voicecraftapi
 
     # Install all packages from VoiceCraft README: https://github.com/jasonppy/VoiceCraft
     info "Installing apt packages..."
@@ -60,6 +60,7 @@ install_api_packages() {
     sudo apt-get install -y libxml2-dev libxslt-dev zlib1g-dev
 
     info "Installing pip requirements..."
+    pip install numpy==1.26.4
     pip install -r "${VOICECRAFTAPI_PATH}/requirements.txt"
 
     info "Installing mfa and mfa models..."
@@ -92,6 +93,7 @@ else
     source "${CONDA_PATH}/etc/profile.d/conda.sh"
     conda activate voicecraftapi
 fi
+source "${CONDA_PATH}/etc/profile.d/conda.sh"
 
 # Install packages
 install_api_packages
