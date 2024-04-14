@@ -46,7 +46,7 @@ install_api_packages() {
     $CONDA_BINARY activate voicecraftapi
 
     # Install all packages from VoiceCraft README: https://github.com/jasonppy/VoiceCraft
-    log "Installing apt packages..."
+    info "Installing apt packages..."
     sudo apt-get update
     sudo apt-get install -y ffmpeg
     sudo apt-get install espeak-ng
@@ -56,10 +56,10 @@ install_api_packages() {
     sudo apt-get install -y flac libasound2-dev libsndfile1-dev vorbis-tools
     sudo apt-get install -y libxml2-dev libxslt-dev zlib1g-dev
 
-    log "Installing pip requirements..."
+    info "Installing pip requirements..."
     pip install -r "${VOICECRAFTAPI_PATH}/requirements.txt"
 
-    log "Installing mfa and mfa models..."
+    info "Installing mfa and mfa models..."
     $CONDA_BINARY install -c conda-forge montreal-forced-aligner=2.2.17 openfst=1.8.2 kaldi=5.5.1068
     mfa model download dictionary english_us_arpa
     mfa model download acoustic english_us_arpa
@@ -68,19 +68,19 @@ install_api_packages() {
 }
 
 # Call sudo once and then refresh it every 60s so that user only has to input it once.
-log "Please input your password so that the script can use sudo to install system packages."
+info "Please input your password so that the script can use sudo to install system packages."
 sudo -v
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 # Enter the VoiceCraftAPI path
-log "Entering VoiceCraftAPI folder: ${VOICECRAFTAPI_PATH}"
+info "Entering VoiceCraftAPI folder: ${VOICECRAFTAPI_PATH}"
 cd "${VOICECRAFTAPI_PATH}"
 
 # If the conda binary doesn't exist, run install_conda()
 if ! command -v $CONDA_BINARY &> /dev/null; then
     install_conda
 else
-    log "Conda already installed. Activating 'voicecraftapi' environment..."
+    info "Conda already installed. Activating 'voicecraftapi' environment..."
     $CONDA_BINARY activate voicecraftapi
 fi
 
@@ -88,5 +88,5 @@ fi
 install_api_packages
 
 # Clone the VoiceCraft repository.
-log "Cloning the VoiceCraft repository..."
+info "Cloning the VoiceCraft repository..."
 git clone https://github.com/jasonppy/VoiceCraft
