@@ -27,8 +27,10 @@ install_conda() {
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
     # Install Conda
     bash miniconda.sh -b -p "${CONDA_PATH}"
-    # Initialize Conda
-    $CONDA_BINARY init
+    # Source conda
+    source "${CONDA_PATH}/etc/profile.d/conda.sh"
+    # Init conda
+    conda init
     # Cleanup
     rm miniconda.sh
     info "Conda installation completed."
@@ -87,7 +89,7 @@ if ! command -v $CONDA_BINARY &> /dev/null; then
     install_conda
 else
     info "Conda already installed. Activating 'voicecraftapi' environment..."
-    $CONDA_BINARY init
+    source "${CONDA_PATH}/etc/profile.d/conda.sh"
     conda activate voicecraftapi
 fi
 
