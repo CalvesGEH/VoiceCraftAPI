@@ -145,29 +145,22 @@ def load_models(whisper_backend_name, whisper_model_name, alignment_model_name, 
             transcribe_model = WhisperxModel(whisper_model_name, align_model)
 
     voicecraft_name = f"{voicecraft_model_name}.pth"
-    ckpt_fn = f"{MODELS_PATH}/{voicecraft_name}"
-    encodec_fn = f"{MODELS_PATH}/encodec_4cb2048_giga.th"
-    if not os.path.exists(ckpt_fn):
-        logger.debug(f"Downloading {voicecraft_name} to {MODELS_PATH}.")
-        os.system(f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/{voicecraft_name}\?download\=true")
-        os.system(f"mv {voicecraft_name}\?download\=true {MODELS_PATH}/{voicecraft_name}")
-    if not os.path.exists(encodec_fn):
-        logger.debug(f"Downloading encodec_4cb2048_giga.th to {MODELS_PATH}.")
-        os.system(f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/encodec_4cb2048_giga.th")
-        os.system(f"mv encodec_4cb2048_giga.th {MODELS_PATH}/encodec_4cb2048_giga.th")
-
-    ckpt = torch.load(ckpt_fn, map_location="cpu")
-    model = voicecraft.VoiceCraft(ckpt["config"])
-    model.load_state_dict(ckpt["model"])
+    model = voicecraft.VoiceCraftHF.from_pretrained(f"pyp1/VoiceCraft_{voicecraft_name.replace('.pth', '')}")
+    phn2num = model.args.phn2num
+    config = model.args
     model.to(device)
-    model.eval()
+
+    encodec_fn = f"{MODELS_PATH}/encodec_4cb2048_giga.th"
+    if not os.path.exists(encodec_fn):
+        os.system(f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/encodec_4cb2048_giga.th")
+
     voicecraft_model = {
-        "ckpt": ckpt,
+        "config": config,
+        "phn2num": phn2num,
         "model": model,
         "text_tokenizer": TextTokenizer(backend="espeak"),
         "audio_tokenizer": AudioTokenizer(signature=encodec_fn)
     }
-    logger.info("Succesfully loaded models.")
     return True
 
 
@@ -213,6 +206,8 @@ def align_segments(transcript, audio_path, voice):
     task.sync_map_file_path_absolute = os.path.abspath(sync_map_path)
     ExecuteTask(task).execute()
     task.output_sync_map_file()
+
+    logger.debug(f'Saved alignment files to {transcript_path} and {sync_map_path}.')
 
     logger.debug("Finished aligning segments. Returning sync_map as json.")
     with open(sync_map_path, "r") as f:
@@ -278,6 +273,8 @@ def generate(seed, top_k, top_p, temperature, stop_repetition, sample_batch_size
     else:
         sentences = [transcript.replace("\n", " ")]
 
+    logger.debug(f'Generated sentences: {sentences}')
+
     info = torchaudio.info(audio_path)
     audio_dur = info.num_frames / info.sample_rate
 
@@ -306,16 +303,18 @@ def generate(seed, top_k, top_p, temperature, stop_repetition, sample_batch_size
             else:
                 target_transcript = sentence
 
+            logger.debug(f'Created target_transcript: {target_transcript}')
+
             inference_transcript += target_transcript + "\n"
 
             prompt_end_frame = int(min(audio_dur, prompt_end_time) * info.sample_rate)
             _, gen_audio = inference_one_sample(voicecraft_model["model"],
-                                                voicecraft_model["ckpt"]["config"],
-                                                voicecraft_model["ckpt"]["phn2num"],
+                                                voicecraft_model["config"],
+                                                voicecraft_model["phn2num"],
                                                 voicecraft_model["text_tokenizer"], voicecraft_model["audio_tokenizer"],
                                                 audio_path, target_transcript, device, decode_config,
                                                 prompt_end_frame)
-
+            
         gen_audio = gen_audio[0].cpu()
         audio_tensors.append(gen_audio)
 
@@ -470,30 +469,55 @@ async def edit_voice_config(
 @app.post("/generateaudio/{voice}")
 async def generate_voice_audio(
     voice: str,
-    target_text: str = Form(""),
+    target_text: str = Form(...),
     device: str = Form(None),
 ):
-    if not os.path.exists('{VOICES_PATH}/{voice}/{voice}.wav'):
+    if not os.path.exists(f'{VOICES_PATH}/{voice}/{voice}.wav'):
+        logger.error(f'Missing the {voice}.wav file when generating audio. Returning error message and cancelling API call to /generateaudio/{voice}.')
         return {"message": "Missing the {voice}.wav file! Please recreate the voice using the /newvoice endpoint.", "status_code": 500}
-    if not os.path.exists('{VOICES_PATH}/{voice}/{voice}_options.json'):
+    if not os.path.exists(f'{VOICES_PATH}/{voice}/{voice}_options.json'):
+        logger.error(f'Missing the {voice}_options.json file when generating audio. Returning error message and cancelling API call to /generateaudio/{voice}.')
         return {"message": "Missing the {voice}_options.json file! Please recreate the voice using the /newvoice endpoint.", "status_code": 500}
-    if not os.path.exists('{VOICES_PATH}/{voice}/{voice}_alignment.json'):
+    if not os.path.exists(f'{VOICES_PATH}/{voice}/{voice}_alignment.json'):
+        logger.error(f'Missing the {voice}_alignment.jsonfile when generating audio. Returning error message and cancelling API call to /generateaudio/{voice}.')
         return {"message": "Missing the {voice}_alignment.json file! Please recreate the voice using the /newvoice endpoint.", "status_code": 500}
-    if not os.path.exists('{VOICES_PATH}/{voice}/{voice}.json'):
-        return {"message": "Missing the sync_map {voice}.json file! Please recreate the voice using the /newvoice endpoint.", "status_code": 500}
+    
+
+    prompt_end_time = None
+    if os.path.exists(f'{VOICES_PATH}/{voice}/{voice}.json'):
+        logger.debug('sync_map_file exists, using it for the prompt end time.')
+        with open(f'{VOICES_PATH}/{voice}/{voice}.json', 'r') as f:
+            sync_map = json.load(f) # The sync_map only ever has a single fragment in it because we replace all newlines with spaces.
+            prompt_end_time = sync_map['fragments'][-1]['end']
+    else:
+        logger.debug('sync_map_file does not exist, grabbing prompt end time from the alignment file.')
+
+
     
     # Load in transcribe_state, voice_options and sync_map
     with open(f'{VOICES_PATH}/{voice}/{voice}_options.json', 'r') as f:
         options = json.load(f)
     with open(f'{VOICES_PATH}/{voice}/{voice}_alignment.json', 'r') as f:
         transcribe_state = json.load(f)
-    with open(f'{VOICES_PATH}/{voice}/{voice}.json', 'r') as f:
-        sync_map = json.load(f) # The sync_map only ever has a single fragment in it because we replace all newlines with spaces.
-    output_audio, inference_transcript, audio_tensors = generate(options.seed, options.top_k,
-                                                                 options.top_p, options.temperature,
-                                                                 options.stop_repetition, options.sample_batch_size,
-                                                                 options.kvcache, '{VOICES_PATH}/{voice}/{voice}.wav',
-                                                                 transcribe_state, target_text, "TTS", sync_map.fragments[0].end)
+        if not prompt_end_time:
+            prompt_end_time = transcribe_state['segments'][-1]['end'] # Grab the last segment's end time
+
+    logger.debug(f'''Generating audio using the following parameters:
+                seed: {options['seed']}
+                top_k: {options['top_k']}
+                top_p: {options['top_p']}
+                temperature: {options['temperature']}
+                stop_repetition: {options['stop_repetition']}
+                sample_batch_size: {options['sample_batch_size']}
+                kvcache: {options['kvcache']}
+                target_text: {target_text}
+                prompt_end_time: {prompt_end_time}
+                ''')
+    output_audio, inference_transcript, audio_tensors = generate(options['seed'], options['top_k'],
+                                                                 options['top_p'], options['temperature'],
+                                                                 options['stop_repetition'], options['sample_batch_size'],
+                                                                 options['kvcache'], f'{VOICES_PATH}/{voice}/{voice}.wav',
+                                                                 transcribe_state, target_text, False, "TTS", prompt_end_time)
 
     # Serve the generated audio as bytes
     audio_bytes = io.BytesIO()

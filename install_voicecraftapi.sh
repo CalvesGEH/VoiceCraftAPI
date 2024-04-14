@@ -103,11 +103,11 @@ install_api_packages
 
 # Clone the VoiceCraft repository.
 if [ -d "${VOICECRAFTAPI_PATH}/VoiceCraft" ]; then
-    info "VoiceCraft repository is already here. Pulling any changes..."
-    cd "${VOICECRAFTAPI_PATH}/VoiceCraft"
-    git pull
-    cd "${VOICECRAFTAPI_PATH}"
+    info "VoiceCraft repository already exists."
 else
     info "Cloning the VoiceCraft repository..."
     git clone https://github.com/jasonppy/VoiceCraft
+    cd "${VOICECRAFTAPI_PATH}/VoiceCraft"
+    git reset --hard 57079c4
+    cd "${VOICECRAFTAPI_PATH}"
 fi
