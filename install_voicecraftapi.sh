@@ -60,8 +60,11 @@ install_api_packages() {
     sudo apt-get install -y libxml2-dev libxslt-dev zlib1g-dev
 
     info "Installing pip requirements..."
-    pip install numpy==1.26.4
+    pip install numpy==1.26.4 # Numpy is seperate otherwise 'aeneas' complains.
     pip install -r "${VOICECRAFTAPI_PATH}/requirements.txt"
+    # Audiocraft needs to be installed seperately from requirement.txt as it seems like 'hydra' will complain about a missing 
+    # config folder when installed through requirements.txt.
+    pip install -e git+https://github.com/facebookresearch/audiocraft.git@c5157b5bf14bf83449c17ea1eeb66c19fb4bc7f0#egg=audiocraft
 
     info "Installing mfa and mfa models..."
     conda install -c conda-forge montreal-forced-aligner=2.2.17 openfst=1.8.2 kaldi=5.5.1068
