@@ -153,6 +153,7 @@ def load_models(whisper_backend_name, whisper_model_name, alignment_model_name, 
     encodec_fn = f"{MODELS_PATH}/encodec_4cb2048_giga.th"
     if not os.path.exists(encodec_fn):
         os.system(f"wget https://huggingface.co/pyp1/VoiceCraft/resolve/main/encodec_4cb2048_giga.th")
+        os.system(f"mv encodec_4cb2048_giga.th {encodec_fn}")
 
     voicecraft_model = {
         "config": config,
@@ -239,6 +240,7 @@ def get_output_audio(audio_tensors, codec_audio_sr):
     buffer.seek(0)
     return buffer.read()
 
+
 # Parameters:
 #     seed: Random seed
 #     top_k:
@@ -267,11 +269,14 @@ def generate(seed, top_k, top_p, temperature, stop_repetition, sample_batch_size
         logger.error("Can't use smart transcript: whisper transcript not found.")
         return False
 
+    # Sanitize the transcript
+    sanitized_transcript = transcript.strip('"').strip('\\').strip('*')
+
     seed_everything(seed)
     if mode == "Long TTS":
-        sentences = transcript.split('\n')
+        sentences = sanitized_transcript.split('\n')
     else:
-        sentences = [transcript.replace("\n", " ")]
+        sentences = [sanitized_transcript.replace("\n", " ")]
 
     logger.debug(f'Generated sentences: {sentences}')
 
@@ -321,37 +326,6 @@ def generate(seed, top_k, top_p, temperature, stop_repetition, sample_batch_size
     output_audio = get_output_audio(audio_tensors, codec_audio_sr)
     sentences = [f"{idx}: {text}" for idx, text in enumerate(sentences)]
     return output_audio, inference_transcript, audio_tensors
-
-
-def load_sentence(selected_sentence, codec_audio_sr, audio_tensors):
-    if selected_sentence is None:
-        return None
-    colon_position = selected_sentence.find(':')
-    selected_sentence_idx = int(selected_sentence[:colon_position])
-    return get_output_audio([audio_tensors[selected_sentence_idx]], codec_audio_sr)
-
-
-def update_bound_word(is_first_word, selected_word, edit_word_mode):
-    if selected_word is None:
-        return None
-
-    word_start_time = float(selected_word.split(' ')[0])
-    word_end_time = float(selected_word.split(' ')[-1])
-    if edit_word_mode == "Replace half":
-        bound_time = (word_start_time + word_end_time) / 2
-    elif is_first_word:
-        bound_time = word_start_time
-    else:
-        bound_time = word_end_time
-
-    return bound_time
-
-
-def update_bound_words(from_selected_word, to_selected_word, edit_word_mode):
-    return [
-        update_bound_word(True, from_selected_word, edit_word_mode),
-        update_bound_word(False, to_selected_word, edit_word_mode),
-    ]
 
 
 ############################
@@ -481,7 +455,6 @@ async def generate_voice_audio(
     if not os.path.exists(f'{VOICES_PATH}/{voice}/{voice}_alignment.json'):
         logger.error(f'Missing the {voice}_alignment.jsonfile when generating audio. Returning error message and cancelling API call to /generateaudio/{voice}.')
         return {"message": "Missing the {voice}_alignment.json file! Please recreate the voice using the /newvoice endpoint.", "status_code": 500}
-    
 
     prompt_end_time = None
     if os.path.exists(f'{VOICES_PATH}/{voice}/{voice}.json'):
@@ -491,8 +464,6 @@ async def generate_voice_audio(
             prompt_end_time = sync_map['fragments'][-1]['end']
     else:
         logger.debug('sync_map_file does not exist, grabbing prompt end time from the alignment file.')
-
-
     
     # Load in transcribe_state, voice_options and sync_map
     with open(f'{VOICES_PATH}/{voice}/{voice}_options.json', 'r') as f:
@@ -517,7 +488,7 @@ async def generate_voice_audio(
                                                                  options['top_p'], options['temperature'],
                                                                  options['stop_repetition'], options['sample_batch_size'],
                                                                  options['kvcache'], f'{VOICES_PATH}/{voice}/{voice}.wav',
-                                                                 transcribe_state, target_text, False, "TTS", prompt_end_time)
+                                                                 transcribe_state, target_text, True, "TTS", prompt_end_time)
 
     # Serve the generated audio as bytes
     audio_bytes = io.BytesIO()
