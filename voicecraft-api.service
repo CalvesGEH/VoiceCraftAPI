@@ -1,0 +1,13 @@
+[Unit]
+Description=VoiceCraft Server API
+After=network.target
+
+[Service]
+Type=simple
+User=voicecraftapi
+Group=voicecraftapi
+ExecStart=/bin/bash /usr/share/voicecraftapi/run_api.sh
+WorkingDirectory=/usr/share/voicecraftapi/
+
+[Install]
+WantedBy=multi-user.target

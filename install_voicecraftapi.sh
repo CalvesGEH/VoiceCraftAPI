@@ -36,17 +36,7 @@ install_conda() {
     info "Conda installation completed."
 }
 
-install_api_packages() {
-    info "Installing VoiceCraftAPI packages..."
-    # Create a conda environment named voicecraftapi only if it doesn't exist
-    if [ "$(conda env list | grep voicecraftapi)" ]; then
-        info "VoiceCraftAPI environment already exists. Updating..."
-    else
-        conda create -n voicecraftapi python=3.9.16 -y
-    fi
-    # Activate the environment
-    source activate voicecraftapi
-
+install_apt_packages() {
     # Install all packages from VoiceCraft README: https://github.com/jasonppy/VoiceCraft
     info "Installing apt packages..."
     sudo apt-get update
@@ -58,6 +48,18 @@ install_api_packages() {
     sudo apt-get install -y build-essential
     sudo apt-get install -y flac libasound2-dev libsndfile1-dev vorbis-tools
     sudo apt-get install -y libxml2-dev libxslt-dev zlib1g-dev
+}
+
+install_api_packages() {
+    info "Installing VoiceCraftAPI pip packages..."
+    # Create a conda environment named voicecraftapi only if it doesn't exist
+    if [ "$(conda env list | grep voicecraftapi)" ]; then
+        info "VoiceCraftAPI environment already exists. Updating..."
+    else
+        conda create -n voicecraftapi python=3.9.16 -y
+    fi
+    # Activate the environment
+    conda activate voicecraftapi
 
     info "Installing pip requirements..."
     pip install numpy==1.26.4 # Numpy is seperate otherwise 'aeneas' complains.
@@ -73,6 +75,12 @@ install_api_packages() {
 
     info "Finished installing all VoiceCraftAPI packages."
 }
+
+for arg in "$@"; do
+  if [ "$arg" == "--skip-apt" ]; then
+    skip_apt_installation=true
+  fi
+done
 
 # Call sudo once and then refresh it every 60s so that user only has to input it once.
 info "Please input your password so that the script can use sudo to install system packages."
@@ -99,6 +107,9 @@ fi
 source "${CONDA_PATH}/etc/profile.d/conda.sh"
 
 # Install packages
+if [ -z "${skip_apt_installation}" ]; then
+    install_apt_packages
+fi
 install_api_packages
 
 # Clone the VoiceCraft repository.
