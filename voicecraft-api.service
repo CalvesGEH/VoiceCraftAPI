@@ -6,8 +6,8 @@ After=network.target
 Type=simple
 User=voicecraftapi
 Group=voicecraftapi
-ExecStart=/bin/bash /usr/share/voicecraftapi/run_api.sh
-WorkingDirectory=/usr/share/voicecraftapi/
+ExecStart=/bin/bash /usr/share/voicecraftapi/VoiceCraftAPI/run_api.sh
+WorkingDirectory=/usr/share/voicecraftapi/VoiceCraftAPI/
 
 [Install]
 WantedBy=multi-user.target
