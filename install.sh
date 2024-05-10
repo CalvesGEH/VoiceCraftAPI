@@ -33,7 +33,7 @@ create_voicecraftapi_user() {
 
 configure_systemd() {
     info "Creating systemd service."
-    sudo cp /usr/share/voicecraftapi/voicecraft-api.service /etc/systemd/system/voicecraft-api.service
+    sudo cp /usr/share/voicecraftapi/VoiceCraftAPI/voicecraft-api.service /etc/systemd/system/voicecraft-api.service
     sudo systemctl daemon-reload
     sudo systemctl enable --now voicecraft-api.service
 }
@@ -47,9 +47,11 @@ install_apt_packages
 create_voicecraftapi_user
 
 # Login as user
-sudo -u voicecraftapi /bin/bash -c "cd ~/ && \
-git clone https://github.com/CalvesGEH/VoiceCraftAPI.git && \
-cd ~/VoiceCraftAPI && \
-./install_voicecraftapi.sh --skip-apt"
+sudo -i -u voicecraftapi /bin/bash << EOF
+cd ~/
+git clone https://github.com/CalvesGEH/VoiceCraftAPI.git
+cd ~/VoiceCraftAPI
+./install_voicecraftapi.sh --skip-apt
+EOF
 
 configure_systemd

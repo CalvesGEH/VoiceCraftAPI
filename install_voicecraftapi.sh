@@ -52,14 +52,14 @@ install_apt_packages() {
 
 install_api_packages() {
     info "Installing VoiceCraftAPI pip packages..."
-    # Create a conda environment named voicecraftapi only if it doesn't exist
-    if [ "$(conda env list | grep voicecraftapi)" ]; then
+    # Create a conda environment named voicecraftapiconda only if it doesn't exist
+    if [ "$(conda env list | grep voicecraftapiconda)" ]; then
         info "VoiceCraftAPI environment already exists. Updating..."
     else
-        conda create -n voicecraftapi python=3.9.16 -y
+        conda create -n voicecraftapiconda python=3.9.16 -y
     fi
     # Activate the environment
-    conda activate voicecraftapi
+    conda activate voicecraftapiconda
 
     info "Installing pip requirements..."
     pip install numpy==1.26.4 # Numpy is seperate otherwise 'aeneas' complains.
@@ -77,9 +77,10 @@ install_api_packages() {
 }
 
 for arg in "$@"; do
-  if [ "$arg" == "--skip-apt" ]; then
-    skip_apt_installation=true
-  fi
+    if [ "$arg" == "--skip-apt" ]; then
+        info "--skip-apt flag set. Skipping apt package installation."
+        skip_apt_installation=true
+    fi
 done
 
 # Call sudo once and then refresh it every 60s so that user only has to input it once.
@@ -100,14 +101,15 @@ cd "${VOICECRAFTAPI_PATH}"
 if ! command -v $CONDA_BINARY &> /dev/null; then
     install_conda
 else
-    info "Conda already installed. Activating 'voicecraftapi' environment..."
+    info "Conda already installed. Activating 'voicecraftapiconda' environment..."
     source "${CONDA_PATH}/etc/profile.d/conda.sh"
-    conda activate voicecraftapi
+    conda activate voicecraftapiconda
 fi
 source "${CONDA_PATH}/etc/profile.d/conda.sh"
 
 # Install packages
 if [ -z "${skip_apt_installation}" ]; then
+    error "Installing pacakges"
     install_apt_packages
 fi
 install_api_packages
