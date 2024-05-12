@@ -49,14 +49,12 @@ create_voicecraftapi_user
 # Login as user
 sudo -i -u voicecraftapi /bin/bash << EOF
 cd ~/
-repo_url="https://github.com/CalvesGEH/VoiceCraftAPI"
-dir_name=$(basename ${repo_url} .git)
-if [ -d "$dir_name" ]; then
+if [ -d "$(basename https://github.com/CalvesGEH/VoiceCraftAPI .git)" ]; then
     echo "Directory exists, pulling latest changes..."
-    cd $dir_name && git pull origin master
+    cd $(basename https://github.com/CalvesGEH/VoiceCraftAPI .git) && git pull origin master
 else
     echo "Cloning repository..."
-    git clone $repo_url && cd $dir_name
+    git clone https://github.com/CalvesGEH/VoiceCraftAPI && cd $(basename https://github.com/CalvesGEH/VoiceCraftAPI .git)
 fi
 ./install_voicecraftapi.sh --skip-apt
 EOF
