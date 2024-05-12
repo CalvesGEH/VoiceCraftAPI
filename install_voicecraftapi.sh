@@ -115,12 +115,13 @@ fi
 install_api_packages
 
 # Clone the VoiceCraft repository.
-if [ -d "${VOICECRAFTAPI_PATH}/VoiceCraft" ]; then
-    info "VoiceCraft repository already exists."
-else
+if [ ! -d "${VOICECRAFTAPI_PATH}/VoiceCraft" ]; then
     info "Cloning the VoiceCraft repository..."
     git clone https://github.com/jasonppy/VoiceCraft
-    cd "${VOICECRAFTAPI_PATH}/VoiceCraft"
-    git reset --hard 013a21c
-    cd "${VOICECRAFTAPI_PATH}"
 fi
+
+# Set the VoiceCraft repository to the correct commit
+info "Setting VoiceCraft HEAD to commit: 013a21c"
+cd "${VOICECRAFTAPI_PATH}/VoiceCraft"
+git reset --hard 013a21c
+cd "${VOICECRAFTAPI_PATH}"
