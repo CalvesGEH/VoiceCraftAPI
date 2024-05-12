@@ -39,6 +39,8 @@ docker run -p 8245:8245 --name voicecraft-api voicecraft-api
 
 The API will be accessible on http://localhost:8245.
 
+Note for Windows users: You may need to change `install_voicecraftapi.sh` and `run_api.sh` from a CRLF to an LF End of Line Sequence format to allow the Dockerfile to read these files correctly.
+
 ## Uninstalling
 
 I have also provided a script which will uninstall VoiceCraftAPI except for the APT packages required, those can be manually uninstalled if you'd like.
