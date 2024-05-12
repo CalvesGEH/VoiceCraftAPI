@@ -125,8 +125,9 @@ class WhisperxModel:
 #     alignment_mode_name: 'None'or 'whisperX'. 'whisperX' is default.
 #     voicecraft_model:
 #         - 'giga330M'
-#         - 'giga830M' (default)
+#         - 'giga830M'
 #         - 'giga330M_TTSEnhanced'
+#         - '830M_TTSEnhanced.pth' (default)
 def load_models(whisper_backend_name, whisper_model_name, alignment_model_name, voicecraft_model_name):
     global transcribe_model, align_model, voicecraft_model
 
@@ -145,8 +146,7 @@ def load_models(whisper_backend_name, whisper_model_name, alignment_model_name, 
                 return False
             transcribe_model = WhisperxModel(whisper_model_name, align_model)
 
-    voicecraft_name = f"{voicecraft_model_name}.pth"
-    model = voicecraft.VoiceCraftHF.from_pretrained(f"pyp1/VoiceCraft_{voicecraft_name.replace('.pth', '')}")
+    model = voicecraft.VoiceCraft.from_pretrained(f'pyp1/VoiceCraft_{voicecraft_model_name}')
     phn2num = model.args.phn2num
     config = model.args
     model.to(device)
@@ -348,7 +348,7 @@ async def generate__or_update_voice(
     temperature: float = Form(1.0),
     stop_repetition: int = Form(3),
     kvcache: int = Form(1),
-    sample_batch_size: int = Form(4),
+    sample_batch_size: int = Form(3),
     seed: int = Form(-1) # Random Seed
 ):
     logger.info("Received request to generate new voice.")
@@ -504,7 +504,7 @@ async def generate_voice_audio(
 if __name__ == "__main__":
     import uvicorn
     logger.info("Loading models...")
-    load_models('whisperX', 'base.en', 'whisperX', 'giga830M')
+    load_models('whisperX', 'base.en', 'whisperX', '830M_TTSEnhanced')
 
     logger.info("Starting uvicorn server...")
     uvicorn.run(app, host="0.0.0.0", port=8245)

@@ -121,6 +121,6 @@ else
     info "Cloning the VoiceCraft repository..."
     git clone https://github.com/jasonppy/VoiceCraft
     cd "${VOICECRAFTAPI_PATH}/VoiceCraft"
-    git reset --hard 57079c4
+    git reset --hard 013a21c
     cd "${VOICECRAFTAPI_PATH}"
 fi
