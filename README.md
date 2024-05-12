@@ -4,7 +4,7 @@ This is a API for the extremely awesome [VoiceCraft](https://github.com/jasonppy
 
 ## Installing
 
-Currently, the API is only supported on Ubuntu/Debian systems but that may change in the future if enough people want other distributions.
+Currently, the API is only natively supported on Ubuntu/Debian systems, but that may change in the future if enough people want other distributions. Alternatively, the API can be run on Windows / macOS using Docker.
 
 ### Automatic
 
@@ -29,6 +29,15 @@ cd VoiceCraftAPI
 ```
 
 Once installed, you can also manually edit and install the systemd service.
+
+### Docker
+VoiceCraft API is compatible with Windows / macOS via Docker. Run the commands below to start the server:
+```bash
+docker build -t voicecraft-api .
+docker run -p 8245:8245 --name voicecraft-api voicecraft-api
+```
+
+The API will be accessible on http://localhost:8245.
 
 ## Uninstalling
 
@@ -65,5 +74,5 @@ This endpoint will generate audio as the given voice using the `target_text` giv
 It is extremely simple to use once the API is up and running. I start by finding a suitable voice clip for the character I want to clone and then edit the file to ensure it is a .wav at 16000Hz. Then, I navigate to `http://<YOUR_SERVER_IP>:8245/docs` and test the `/newvoice` endpoint directly in the browser, giving it my .wav file and then executing the request. Now that the voice is generated, I can make a request to the server to generate text.
 
 ```bash
-curl --output generated.wav -d 'target_text=It is crazy how easy it is to use VoiceCraft api!' http://<YOUR_SERVER_IP>:8245/generateaudio/<VOICE>
+curl --output generated.wav -d "target_text=It is crazy how easy it is to use VoiceCraft api!" http://<YOUR_SERVER_IP>:8245/generateaudio/<VOICE>
 ```
