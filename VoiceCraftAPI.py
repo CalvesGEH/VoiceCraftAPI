@@ -15,6 +15,7 @@ from models import voicecraft
 import io
 import numpy as np
 import random
+import re
 import uuid
 
 # API imports
@@ -238,7 +239,7 @@ def get_output_audio(audio_tensors, codec_audio_sr):
     buffer = io.BytesIO()
     torchaudio.save(buffer, result, int(codec_audio_sr), format="wav")
     buffer.seek(0)
-    return buffer.read()
+    return buffer
 
 
 # Parameters:
@@ -253,13 +254,11 @@ def get_output_audio(audio_tensors, codec_audio_sr):
 #     transcribe_state
 #     transcript
 #     smart_transcript: Whether or not to create the target transcript automatically. If disabled, you need to supply the transcript.
-#     mode: The generation mode. Options: 'TTS', 'Long TTS'.
-#         'Long TTS' will run the model on each and every newline because the model is not equipped to handle a large amount of text at once.
 #     prompt_end_time: End time of the last message of the transcript. Float.
 #     split_text: How to split the transcript. Only applies to 'Long TTS' mode. Options: 'Newline', 'Sentence'.
 def generate(seed, top_k, top_p, temperature, stop_repetition, sample_batch_size, 
         kvcache, audio_path, transcribe_state, transcript, smart_transcript,
-        mode, prompt_end_time,
+        prompt_end_time,
         codec_audio_sr=16000, codec_sr=50, silence_tokens=[1388, 1898, 131] # Codec specific options
         ):
     if voicecraft_model is None:
@@ -269,14 +268,23 @@ def generate(seed, top_k, top_p, temperature, stop_repetition, sample_batch_size
         logger.error("Can't use smart transcript: whisper transcript not found.")
         return False
 
-    # Sanitize the transcript
-    sanitized_transcript = transcript.strip('"').strip('\\').strip('*')
-
     seed_everything(seed)
-    if mode == "Long TTS":
-        sentences = sanitized_transcript.split('\n')
-    else:
-        sentences = [sanitized_transcript.replace("\n", " ")]
+
+    if type(transcript) == str:
+        logger.debug(f'Given transcript is a string, separating by sentences into a list.')
+        punctuation_regex = r'[!.?]+\s*'
+        transcript = transcript.strip('"').strip('\\').strip('*')
+        transcript = re.sub(punctuation_regex, '?\\n', transcript)
+        transcript = re.sub(punctuation_regex, '.\\n', transcript)
+        transcript = re.sub(punctuation_regex, '!\\n', transcript)
+        sentences = transcript.split('\n')
+        # Delete last item in list if empty
+        if not sentences[-1].strip():
+            del sentences[-1]
+    elif type(transcript) == list:
+        for i in range(len(transcript)):
+            transcript[i] = transcript[i].strip('"').strip('\\').strip('*')
+        sentences = transcript
 
     logger.debug(f'Generated sentences: {sentences}')
 
@@ -289,42 +297,41 @@ def generate(seed, top_k, top_p, temperature, stop_repetition, sample_batch_size
         decode_config = {"top_k": top_k, "top_p": top_p, "temperature": temperature, "stop_repetition": stop_repetition,
                          "kvcache": kvcache, "codec_audio_sr": codec_audio_sr, "codec_sr": codec_sr,
                          "silence_tokens": silence_tokens, "sample_batch_size": sample_batch_size}
-        if mode == "TTS" or mode == "Long TTS":
-            from inference_tts_scale import inference_one_sample
+        
+        from inference_tts_scale import inference_one_sample
 
-            if smart_transcript:
-                target_transcript = ""
-                for word in transcribe_state["words_info"]:
-                    if word["end"] < prompt_end_time:
-                        target_transcript += word["word"] + (" " if word["word"][-1] != " " else "")
-                    elif (word["start"] + word["end"]) / 2 < prompt_end_time:
-                        # include part of the word it it's big, but adjust prompt_end_time
-                        target_transcript += word["word"] + (" " if word["word"][-1] != " " else "")
-                        prompt_end_time = word["end"]
-                        break
-                    else:
-                        break
-                target_transcript += f" {sentence}"
-            else:
-                target_transcript = sentence
+        if smart_transcript:
+            target_transcript = ""
+            for word in transcribe_state["words_info"]:
+                if word["end"] < prompt_end_time:
+                    target_transcript += word["word"] + (" " if word["word"][-1] != " " else "")
+                elif (word["start"] + word["end"]) / 2 < prompt_end_time:
+                    # include part of the word it it's big, but adjust prompt_end_time
+                    target_transcript += word["word"] + (" " if word["word"][-1] != " " else "")
+                    prompt_end_time = word["end"]
+                    break
+                else:
+                    break
+            target_transcript += f" {sentence}"
+        else:
+            target_transcript = sentence
 
-            logger.debug(f'Created target_transcript: {target_transcript}')
+        logger.debug(f'Created target_transcript: {target_transcript}')
 
-            inference_transcript += target_transcript + "\n"
+        inference_transcript += target_transcript + "\n"
 
-            prompt_end_frame = int(min(audio_dur, prompt_end_time) * info.sample_rate)
-            _, gen_audio = inference_one_sample(voicecraft_model["model"],
-                                                voicecraft_model["config"],
-                                                voicecraft_model["phn2num"],
-                                                voicecraft_model["text_tokenizer"], voicecraft_model["audio_tokenizer"],
-                                                audio_path, target_transcript, device, decode_config,
-                                                prompt_end_frame)
+        prompt_end_frame = int(min(audio_dur, prompt_end_time) * info.sample_rate)
+        _, gen_audio = inference_one_sample(voicecraft_model["model"],
+                                            voicecraft_model["config"],
+                                            voicecraft_model["phn2num"],
+                                            voicecraft_model["text_tokenizer"], voicecraft_model["audio_tokenizer"],
+                                            audio_path, target_transcript, device, decode_config,
+                                            prompt_end_frame)
             
         gen_audio = gen_audio[0].cpu()
         audio_tensors.append(gen_audio)
 
     output_audio = get_output_audio(audio_tensors, codec_audio_sr)
-    sentences = [f"{idx}: {text}" for idx, text in enumerate(sentences)]
     return output_audio, inference_transcript, audio_tensors
 
 
@@ -484,19 +491,15 @@ async def generate_voice_audio(
                 target_text: {target_text}
                 prompt_end_time: {prompt_end_time}
                 ''')
+
     output_audio, inference_transcript, audio_tensors = generate(options['seed'], options['top_k'],
                                                                  options['top_p'], options['temperature'],
                                                                  options['stop_repetition'], options['sample_batch_size'],
                                                                  options['kvcache'], f'{VOICES_PATH}/{voice}/{voice}.wav',
-                                                                 transcribe_state, target_text, True, "TTS", prompt_end_time)
+                                                                 transcribe_state, target_text, True, prompt_end_time)
 
-    # Serve the generated audio as bytes
-    audio_bytes = io.BytesIO()
-    torchaudio.save(audio_bytes, audio_tensors[0], 16000, format="wav")
-    audio_bytes.seek(0)
-    
-    # Serve the generated audio as bytes
-    return StreamingResponse(audio_bytes, media_type="audio/wav")
+    # Serve the generated bytesIO object
+    return StreamingResponse(output_audio, media_type="audio/wav")
 
 if __name__ == "__main__":
     import uvicorn
